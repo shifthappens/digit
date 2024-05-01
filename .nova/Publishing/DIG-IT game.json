@@ -1,0 +1,12 @@
+{
+  "identifier" : "FCF9381F-63A1-45C9-ACAE-5038BA0C1618",
+  "ignoredFilePatterns" : [
+    ".nova",
+    ".git"
+  ],
+  "localPath" : ".",
+  "remotePath" : "\/var\/www\/html\/domains\/coen.at\/public_html\/digit-dev",
+  "remoteURL" : "https:\/\/digit-dev.coen.at",
+  "server" : "DIG-IT game",
+  "usesPublishing" : true
+}

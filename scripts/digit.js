@@ -19,6 +19,7 @@ var Markers = []; //create a collection for the markers
 var MarkersFound = 0; //Counter for markers found
 
 /* GeoLocation variables */
+var geoLocationPermissionGranted = false; // for safari / iOS
 var userPositionMarker; //Marker object for the user's position
 var userPositionMarkerCircle; //Marker object for the location precision circle around the user's position
 var userZoomed; //variable to keep track of whether the map has zoomed already once to the zoom level of the current position of the user
@@ -44,17 +45,17 @@ function checkGeoLocationPermissionStatus()
 		if (permissionStatus.state === 'granted') 
 		{
 			log("yep got location access");
-			setGeoLocationButtonMessage('granted');
+			setGeoLocationPermissionState('granted');
 			
 			navigator.geolocation.getCurrentPosition(initGame, null, geoLocationOptions);
 		}
 		else if (permissionStatus.state === "prompt")
 		{
-			setGeoLocationButtonMessage('prompt');
+			setGeoLocationPermissionState('prompt');
 		}
 		else if (permissionStatus.state === 'denied')
 		{
-			setGeoLocationButtonMessage('denied');
+			setGeoLocationPermissionState('denied');
 		}
 	});
 }
@@ -62,26 +63,38 @@ function checkGeoLocationPermissionStatus()
   // When the user clicks on button, and the location is available, close the modal, start game
   startGameButton.onclick = function() 
   {
-	navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => 
+	log("trying to start game...");
+	if(geoLocationPermissionGranted)
 	{
-	  if (permissionStatus.state === 'granted') 
-	  {
 		gamewelcome.style.display = "none";
-	  }
-	  else if (permissionStatus.state === "prompt")
-	  {
-		getGeoLocationPermission(onSuccess);
+	}
+	else
+	{
+	 	alert("Cannot start game: permission to use location is denied. Please complete step 1.");
+	}
+	
+	// navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => 
+	// {
+	//   if (permissionStatus.state === 'granted') 
+	//   {
+	// 	gamewelcome.style.display = "none";
+	//   }
+	//   else if (permissionStatus.state === "prompt")
+	//   {
+	// 	log("geolocation permission state is still on 'prompt', will try to get it now...")
+	// 	getGeoLocationPermission(onSuccess);
 
-		function onSuccess(result)
-		{
-			gamewelcome.style.display = "none";
-		}
-	  }
-	  else if(permissionStatus.state === 'denied') 
-	  {
-		alert("Cannot start game: permission to use location is denied. Please complete step 1.");  
-	  }
-	});
+	// 	function onSuccess(result)
+	// 	{
+	// 		log("geo location successfully obtained, starting game... (onsuccess callback)")
+	// 		gamewelcome.style.display = "none";
+	// 	}
+	//   }
+	//   else if(permissionStatus.state === 'denied') 
+	//   {
+	// 	alert("Cannot start game: permission to use location is denied. Please complete step 1.");  
+	//   }
+	// });
   }
 
 //check if user permissions have already been given, and set up game in background
@@ -149,22 +162,36 @@ function getMarkersFromMapotic()
 /* Function to get location permission from user */
 function getGeoLocationPermission(onSuccessCallback)
 {
-	navigator.geolocation.getCurrentPosition(onLocationPermissionGranted, onError, geoLocationOptions);
+	log("trying to get permission for geolocation...");
+
+	const customGeoLocationOptions = 
+	{
+		enableHighAccuracy: false, //we don't need a very detailed position, it's just to trigger the permission prompt
+		maximumAge: Infinity
+	}
+	
+	navigator.geolocation.getCurrentPosition(onLocationPermissionGranted, onError, customGeoLocationOptions);
 
 	function onLocationPermissionGranted(pos)
 	{
-		setGeoLocationButtonMessage('granted');
+		log("onsuccesscallback is of type "+typeof(onSuccessCallback));
+
+		setGeoLocationPermissionState('granted');
 		initGame(pos);
+		geoLocationPermissionGranted = true; // for safari / iOS
 		
-		if(onSuccessCallback)
+		if(onSuccessCallback instanceof Function)
 			onSuccessCallback(true);
 	}
 
 	function onError(err)
 	{
+		log("there was an error getting permission for geolocation.");
+		log(err);
+		
 		if (err.code === 1) {
 			alert("You cannot run the game without geolocation access. Please try again.");
-			setGeoLocationButtonMessage('denied');
+			setGeoLocationPermissionState('denied');
 			// Runs if user refuses access
 		} else {
 			log("error code getting location: "+err.code);
@@ -378,20 +405,23 @@ function placeUpdateUserPositionMarker(pos)
 		console.log(msg);
   }
 
-  function setGeoLocationButtonMessage(id)
+  function setGeoLocationPermissionState(id)
   {
 	if(id == "granted")
 	{
 		geoLocationPermissionButton.innerHTML = '<i class="fa fa-check"></i> Geolocation access granted';
 		//geoLocationPermissionButton.onclick = function() { log("ok removing event listener..."); }
+		geoLocationPermissionGranted = true; // for safari / iOS
 	}
 	else if(id == "denied")
 	{
 		geoLocationPermissionButton.innerHTML = '<i class="fa fa-times-circle"></i> Geolocation access denied. Please manually enable in your browser settings and refresh page.';
+		geoLocationPermissionGranted = false; // for safari / iOS
 	}
 	else if(id == "prompt")
 	{
 		geoLocationPermissionButton.innerHTML = 'Enable geolocation';
 		geoLocationPermissionButton.onclick = getGeoLocationPermission;
+		geoLocationPermissionGranted = false; // for safari / iOS
 	}
   }

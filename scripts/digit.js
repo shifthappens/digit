@@ -164,7 +164,7 @@ function getMarkersFromMapotic()
 			Marker.found = false;
 			Marker.markerID = feature.properties.id;
 			addMarkerToGame(Marker);
-			
+
 			if(checkIfFound(Marker))
 				enableMarker(Marker);
 		}
@@ -275,7 +275,6 @@ function initGame(pos)
 	userFocussed = true;
 
 	watchUserPosition();
-
 }
 
   function updateGame(pos) {
@@ -407,10 +406,10 @@ function addManualMarkersForTesting(lat, lng)
 	marker.bindPopup(popupContent);
 	marker.unbindTooltip();
 	updateGameStats();
-	saveGame(marker);
+	saveMarker(marker);
   }
 
-  function saveGame(marker)
+  function saveMarker(marker)
   {
 	if(!hasLocalStoragePermission())
 		return false; //we do not save the game

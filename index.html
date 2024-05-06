@@ -27,11 +27,17 @@
       <div class="icon"><i class="fa fa-warning"></i></div>
       <strong>Caution!</strong> this game is in ALPHA state, meaning very basic, under development and may contain bugs
   </div>
-  <h3>Step 1: allow use of your location</h3>
+  <h3>Step 1: allow use of your location (required)</h3>
   <p>This game requires the use of your geolocation. Please allow your location to be used by clicking this button.</p>
   <button class="button" id="enable-geolocation">Enable geolocation</button>
 
-  <h3>Step 2: How to play</h3>
+  <h3>Step 2: allow us to save your game (optional)</h3>
+  <p>To continue where you left off between browser sessions, allow us to save your progress locally. Nothing will be sent to any server. 
+    Not clicking the button means you have to start over with every page refresh or browser session.</p>
+    <button class="button" id="enable-localstorage">Yes, save my game progress locally!</button>
+  </p>
+
+  <h3>Step 3: How to play</h3>
   <p>
     Get within 10 meters of a marker on the map to activate it or catch it. The marker will turn green and the counter will advance by one in the top right corner to indicate your progress. Tap the marker to open a popup, read about the location and complete the task in the description.<br />
     <div class="alert alert-info alert-white rounded">
@@ -40,7 +46,7 @@
         </div>
   </p>
 
-  <h3>Step 3: How to win</h3>
+  <h3>Step 4: How to win</h3>
   <p>Collect all your answers and submit. The team with the most points (based on number of correct answers, amount of items collected and/or originality of the answers given), will win a small prize. Winners announced on (To Be Determined).</p>
   
   <p><button id="startgame" class="button">OK Got it, let me play!</button></p>

@@ -28,15 +28,48 @@ var manualMarkersPlaced = false; //to check if manual markers have already been 
 var allMarkersLoaded = false; //to check if all markers have been loaded from the database
 
 /* DOM Elements and event bindings */
-document.getElementById("panToLocation").onclick = panZoomToUserLocation;
+document.getElementById("panToLocation").onclick = panZoomToUserLocation; //element in top left corner to pan and zoom to current user location
 
 var geoLocationPermissionButton = document.getElementById("enable-geolocation"); //Get the geolocation permission button
 geoLocationPermissionButton.onclick = getGeoLocationPermission;
 
+//"save game" check and set logic
+var localStoragePermissionButton = document.getElementById("enable-localstorage"); //Get the "save game" permission button
+if(hasLocalStoragePermission())
+	setLocalStoragePermissionState("granted");
+else
+	localStoragePermissionButton.onclick = enableLocalStorage;
+
+//game start button check logic
 var gamewelcome = document.getElementById("gamewelcome"); // Get the welcome screen element
 var startGameButton = document.getElementById("startgame"); // Get the <button> element that starts the game
 
+
+
+
 /* END OF GLOBAL VARIABLES AND OBJECTS */
+
+function enableLocalStorage()
+{
+	try
+	{
+		window.localStorage.setItem("digit_savegame", "yes");
+		setLocalStoragePermissionState("granted");
+	}
+	catch(error)
+	{
+		console.log(error.name+":"+error.message);
+		setLocalStoragePermissionState("denied");
+	}
+}
+
+function hasLocalStoragePermission()
+{
+	if(window.localStorage.getItem("digit_savegame"))
+		return true;
+	else
+		return false;
+}
 
 function checkGeoLocationPermissionStatus()
 {
@@ -72,29 +105,6 @@ function checkGeoLocationPermissionStatus()
 	{
 	 	alert("Cannot start game: permission to use location is denied. Please complete step 1.");
 	}
-	
-	// navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => 
-	// {
-	//   if (permissionStatus.state === 'granted') 
-	//   {
-	// 	gamewelcome.style.display = "none";
-	//   }
-	//   else if (permissionStatus.state === "prompt")
-	//   {
-	// 	log("geolocation permission state is still on 'prompt', will try to get it now...")
-	// 	getGeoLocationPermission(onSuccess);
-
-	// 	function onSuccess(result)
-	// 	{
-	// 		log("geo location successfully obtained, starting game... (onsuccess callback)")
-	// 		gamewelcome.style.display = "none";
-	// 	}
-	//   }
-	//   else if(permissionStatus.state === 'denied') 
-	//   {
-	// 	alert("Cannot start game: permission to use location is denied. Please complete step 1.");  
-	//   }
-	// });
   }
 
 //check if user permissions have already been given, and set up game in background
@@ -146,11 +156,17 @@ function getMarkersFromMapotic()
 		mapinfo.features.forEach((feature, i) => {
 		if(feature.properties.category_name.en == "Gnome")
 		{
-			log("adding a gnome at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
+			//log(feature);
+			log("adding item "+feature.properties.id+" at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
 			var lng = feature.geometry.coordinates[0];
 			var lat = feature.geometry.coordinates[1];
-			var gnomeMarker = L.marker([lat, lng], {icon: gnomeIconNotFound}).addTo(map);
-			addMarkerToGame(gnomeMarker);
+			var Marker = L.marker([lat, lng], {icon: gnomeIconNotFound}).addTo(map);
+			Marker.found = false;
+			Marker.markerID = feature.properties.id;
+			addMarkerToGame(Marker);
+			
+			if(checkIfFound(Marker))
+				enableMarker(Marker);
 		}
 		});
 
@@ -304,9 +320,7 @@ function placeUpdateUserPositionMarker(pos)
 	  marker.setTooltipContent("You are not close enough to collect this item ("+distanceFromUser+"m)");
 
 	  if(distanceFromUser <= minDistanceFromMarker && !marker.found)
-	  {
-	   // updateGameStats();
-			   
+	  {			   
 		enableMarker(marker);
 	  }
 	});
@@ -322,17 +336,18 @@ function placeUpdateUserPositionMarker(pos)
   }
 
   
-  function addManualMarkersForTesting(lat, lng)
-  {
+function addManualMarkersForTesting(lat, lng)
+{
 	// Calculate the destination coordinates 8 meters east (90 degrees) of the current user's location
 	var destinationCoordinates = calculateDestination(lat, lng, 8, 90);
 	log("will place a random gnome 8m away at bearing 90 resulting in "+destinationCoordinates);
-  
-	// Add a gnome marker at the destination coordinates  
-	var gnomeMarker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
-	addMarkerToGame(gnomeMarker);
-	enableMarker(gnomeMarker); //force at least one marker found (closest) so testing is easier...
-	
+
+	// Add a marker at the destination coordinates  
+	var marker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
+	marker.markerID = 1;
+	addMarkerToGame(marker);
+	enableMarker(marker); //force at least one marker found (closest) so testing is easier...
+
 	//add some Markers at random places
 	for (var i = 0; i < 4; i++)
 	{
@@ -340,11 +355,11 @@ function placeUpdateUserPositionMarker(pos)
 		var bearing = Math.floor(Math.random() * 360);
 		var destinationCoordinates = calculateDestination(lat, lng, meters, bearing);
 		log("will place a random gnome "+meters+"m away at bearing "+bearing+" resulting in "+destinationCoordinates);
-		var gnomeMarker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
-		addMarkerToGame(gnomeMarker);
+		var marker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
+		marker.markerID = i;
+		addMarkerToGame(marker);
 	}
-	
-  }
+}
 	
   function panZoomToUserLocation()
   {
@@ -376,21 +391,65 @@ function placeUpdateUserPositionMarker(pos)
   
   function addMarkerToGame(marker)
   {
-	marker.markerID = Markers.length + 1;
 	//add tooltip to indicate user not close enough by default...
 	marker.bindTooltip("You are not close enough to collect this item ("+getUserDistanceFromMarker(marker)+"m)");
+
+	//add marker to global markers array
 	Markers.push(marker);
   }
   
   function enableMarker(marker)
   {
-	marker.found = 1; //mark this gnome as found
+	marker.found = 1; //mark this item as found
 	marker.setIcon(gnomeIconFound); //green icon
 	
 	var popupContent = '<h4>This would contain the content of marker '+(marker.markerID)+'...</h4><iframe width="300" height="300" src="https://www.youtube.com/embed/dQw4w9WgXcQ?si=M7nPi4kHAJD7aQVC" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
 	marker.bindPopup(popupContent);
 	marker.unbindTooltip();
 	updateGameStats();
+	saveGame(marker);
+  }
+
+  function saveGame(marker)
+  {
+	if(!hasLocalStoragePermission())
+		return false; //we do not save the game
+
+	//check existence of the array of found markers
+	if(!window.localStorage.getItem("digit_markers_found"))
+		window.localStorage.setItem("digit_markers_found", "[]");
+
+	//get the found markers array
+	foundmarkers = JSON.parse(window.localStorage.getItem("digit_markers_found"));
+
+	//check if not already in array
+	if(foundmarkers.includes(marker.markerID))
+		return true; //nothing to save, already there
+
+	//not found yet, append the new marker ID to the array
+	foundmarkers.push(marker.markerID);
+
+	//save it to local storage
+	window.localStorage.setItem("digit_markers_found", JSON.stringify(foundmarkers));
+  }
+
+  function checkIfFound(marker)
+  {
+	if(!hasLocalStoragePermission())
+		return false; //we do not have permission to save state
+
+	//check existence of the array of found markers
+	if(!window.localStorage.getItem("digit_markers_found"))
+		window.localStorage.setItem("digit_markers_found", "[]");
+
+	//get the found markers array
+	foundmarkers = JSON.parse(window.localStorage.getItem("digit_markers_found"));
+
+	//check if not already in array
+	if(foundmarkers.includes(marker.markerID))
+		return true; //found already
+	else
+		return false; //not found yet
   }
   
   function updateGameStats()
@@ -423,5 +482,21 @@ function placeUpdateUserPositionMarker(pos)
 		geoLocationPermissionButton.innerHTML = 'Enable geolocation';
 		geoLocationPermissionButton.onclick = getGeoLocationPermission;
 		geoLocationPermissionGranted = false; // for safari / iOS
+	}
+  }
+
+  function setLocalStoragePermissionState(id)
+  {
+	if(id == "granted")
+	{
+		localStoragePermissionButton.innerHTML = '<i class="fa fa-check"></i> Your game will be saved!';
+	}
+	else if(id == "prompt")
+	{
+		localStoragePermissionButton.innerHTML = 'Yes, save my game progress locally!';
+	}
+	else if(id == "denied")
+	{
+		geoLocationPermissionButton.innerHTML = '<i class="fa fa-times-circle"></i> Access to local storage denied. Perhaps you blocked it in settings?';
 	}
   }

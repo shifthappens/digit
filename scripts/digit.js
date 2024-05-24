@@ -3,6 +3,8 @@ var MapoticMapID = 17890; //Mapotic Map ID to query over HTTP GET requests API
 var minDistanceFromMarker = 10;   //Setting how close the user needs to be to a marker to trigger its action
 var debugMode = true; //set debug mode on or off (disables logging)
 var enableTestMarkers = true; //whether or not to place markers for testing purposes on the map
+var enablePanZoomToUserLocation = false; //whether or not to pan and zoom automatically to user position (can be handy during testing)
+var enableMarkersByDefault = true; //wheter or not to enable every Mapotic marker to be enabled by default (mark as found) useful during testing
 
 /* options object for geolocation positioning */
 const geoLocationOptions = {
@@ -114,7 +116,7 @@ checkGeoLocationPermissionStatus();
 
 
   //initiate the map
-  map = L.map('map').setView([51.108978, 17.032669], 17);
+  map = L.map('map').setView([50.08457, 14.43277], 13);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 	  maxZoom: 19,
 	  attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -143,33 +145,25 @@ var gnomeIconFound = L.icon({
 //get the data from Mapotic API with AJAX request
 function getMarkersFromMapotic()
 {
-	var req = new XMLHttpRequest();
-	req.onreadystatechange = processResponse;
-	req.open("GET", "https://www.mapotic.com/api/v1/maps/17890/pois.geojson/");
-	req.send();
 	var mapoticPOISreq = new XMLHttpRequest();
 	mapoticPOISreq.onreadystatechange = processMapoticPOISResponse;
 	mapoticPOISreq.open("GET", "https://www.mapotic.com/api/v1/maps/"+MapoticMapID+"/pois.geojson/");
 	mapoticPOISreq.send();
 
-	function processResponse()
 	function processMapoticPOISResponse()
 	{
-		if (req.readyState != 4) return; // State 4 is DONE
 		if (mapoticPOISreq.readyState != 4) return; // State 4 is DONE
 
-		var mapinfo = JSON.parse(req.responseText);
 		var mapinfo = JSON.parse(mapoticPOISreq.responseText);
 
 		log(mapinfo);
 
 		mapinfo.features.forEach((feature, i) => {
-		if(feature.properties.category_name.en == "Gnome")
 		if(feature.properties.category_name.en == "Mural") //Mural is the name of the category used for all items to be displayed in Prague
 		{
 			//log(feature);
 			log("adding item "+feature.properties.id+" at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
-			log("adding a gnome at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
+			log("adding a marker at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
 			var lng = feature.geometry.coordinates[0];
 			var lat = feature.geometry.coordinates[1];
 			var Marker = L.marker([lat, lng], {icon: gnomeIconNotFound}).addTo(map);
@@ -177,8 +171,6 @@ function getMarkersFromMapotic()
 			Marker.markerID = feature.properties.id;
 			addMarkerToGame(Marker);
 
-			if(checkIfFound(Marker))
-				enableMarker(Marker);
 			//get other data about this marker from Mapotic
 			var POIDetailsreq = new XMLHttpRequest();
 			POIDetailsreq.onreadystatechange = processMapoticPOIDetailResponse;
@@ -187,15 +179,40 @@ function getMarkersFromMapotic()
 
 			function processMapoticPOIDetailResponse()
 			{
-				if (mapoticPOISreq.readyState != 4) return; // State 4 is DONE
+				if (POIDetailsreq.readyState != 4) return; // State 4 is DONE
 
 				var POIinfo = JSON.parse(POIDetailsreq.responseText);
 
 				log(POIinfo);
 
 				//construct the popup content from the mapotic response
+				var markerTitle = POIinfo.name;
+				
+				//loop through all the attributes that come with this marker to find the description text area
+				for (let i = 0; i < POIinfo.attributes_values.length; i++) {
+					const attribute = POIinfo.attributes_values[i];
+
+					if(attribute.attribute.name.en == "Description")
+						{
+							log("yes, found a description to go with this marker...");
+							var markerDesc = attribute.value_html;
+							break;
+						}
+				};
+
+				var markerImageURL = POIinfo.image.image.medium;
+
+				Marker.popupContent = "<strong>" + markerTitle + "</strong> <br />" + "<img src='"+markerImageURL+"' style='width: 100%;' />" + "<p>"+markerDesc + "</p>";
+
+				log(Marker.popupContent);
 
 				addMarkerToGame(Marker);
+
+				if(checkIfFound(Marker))
+					enableMarker(Marker);
+				
+				if(enableMarkersByDefault)
+					enableMarker(Marker);
 			}
 		}
 		});
@@ -392,6 +409,9 @@ function addManualMarkersForTesting(lat, lng)
 	
   function panZoomToUserLocation()
   {
+	if(!enablePanZoomToUserLocation)
+		return false;
+
 	userLatLng = userPositionMarker.getLatLng();
 	map.setView([userLatLng.lat, userLatLng.lng]);
 	// Set map focus to current user position
@@ -429,6 +449,9 @@ function addManualMarkersForTesting(lat, lng)
   
   function enableMarker(marker)
   {
+	if(marker.found == 1)
+		return false; //marker already marked as found, no further action required
+
 	marker.found = 1; //mark this item as found
 	marker.setIcon(gnomeIconFound); //green icon
 

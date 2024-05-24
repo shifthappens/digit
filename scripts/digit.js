@@ -1,4 +1,5 @@
 /* Settings */
+var MapoticMapID = 17890; //Mapotic Map ID to query over HTTP GET requests API
 var minDistanceFromMarker = 10;   //Setting how close the user needs to be to a marker to trigger its action
 var debugMode = true; //set debug mode on or off (disables logging)
 var enableTestMarkers = true; //whether or not to place markers for testing purposes on the map
@@ -142,31 +143,46 @@ var gnomeIconFound = L.icon({
 //get the data from Mapotic API with AJAX request
 function getMarkersFromMapotic()
 {
-	var req = new XMLHttpRequest();
-	req.onreadystatechange = processResponse;
-	req.open("GET", "https://www.mapotic.com/api/v1/maps/17890/pois.geojson/");
-	req.send();
+	var mapoticPOISreq = new XMLHttpRequest();
+	mapoticPOISreq.onreadystatechange = processMapoticPOISResponse;
+	mapoticPOISreq.open("GET", "https://www.mapotic.com/api/v1/maps/"+MapoticMapID+"/pois.geojson/");
+	mapoticPOISreq.send();
 
-	function processResponse()
+	function processMapoticPOISResponse()
 	{
-		if (req.readyState != 4) return; // State 4 is DONE
+		if (mapoticPOISreq.readyState != 4) return; // State 4 is DONE
 
-		var mapinfo = JSON.parse(req.responseText);
+		var mapinfo = JSON.parse(mapoticPOISreq.responseText);
+
+		log(mapinfo);
 
 		mapinfo.features.forEach((feature, i) => {
-		if(feature.properties.category_name.en == "Gnome")
+		if(feature.properties.category_name.en == "Mural") //Mural is the name of the category used for all items to be displayed in Prague
 		{
-			//log(feature);
-			log("adding item "+feature.properties.id+" at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
+			log("adding a gnome at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
 			var lng = feature.geometry.coordinates[0];
 			var lat = feature.geometry.coordinates[1];
 			var Marker = L.marker([lat, lng], {icon: gnomeIconNotFound}).addTo(map);
-			Marker.found = false;
 			Marker.markerID = feature.properties.id;
-			addMarkerToGame(Marker);
 
-			if(checkIfFound(Marker))
-				enableMarker(Marker);
+			//get other data about this marker from Mapotic
+			var POIDetailsreq = new XMLHttpRequest();
+			POIDetailsreq.onreadystatechange = processMapoticPOIDetailResponse;
+			POIDetailsreq.open("GET", "https://www.mapotic.com/api/v1/maps/"+MapoticMapID+"/public-pois/"+Marker.markerID+"/");
+			POIDetailsreq.send();
+
+			function processMapoticPOIDetailResponse()
+			{
+				if (mapoticPOISreq.readyState != 4) return; // State 4 is DONE
+
+				var POIinfo = JSON.parse(POIDetailsreq.responseText);
+		
+				log(POIinfo);
+
+				//construct the popup content from the mapotic response
+
+				addMarkerToGame(Marker);
+			}
 		}
 		});
 
@@ -275,6 +291,7 @@ function initGame(pos)
 	userFocussed = true;
 
 	watchUserPosition();
+
 }
 
   function updateGame(pos) {
@@ -319,7 +336,9 @@ function placeUpdateUserPositionMarker(pos)
 	  marker.setTooltipContent("You are not close enough to collect this item ("+distanceFromUser+"m)");
 
 	  if(distanceFromUser <= minDistanceFromMarker && !marker.found)
-	  {			   
+	  {
+	   // updateGameStats();
+			   
 		enableMarker(marker);
 	  }
 	});
@@ -335,18 +354,17 @@ function placeUpdateUserPositionMarker(pos)
   }
 
   
-function addManualMarkersForTesting(lat, lng)
-{
+  function addManualMarkersForTesting(lat, lng)
+  {
 	// Calculate the destination coordinates 8 meters east (90 degrees) of the current user's location
 	var destinationCoordinates = calculateDestination(lat, lng, 8, 90);
 	log("will place a random gnome 8m away at bearing 90 resulting in "+destinationCoordinates);
-
-	// Add a marker at the destination coordinates  
-	var marker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
-	marker.markerID = 1;
-	addMarkerToGame(marker);
-	enableMarker(marker); //force at least one marker found (closest) so testing is easier...
-
+  
+	// Add a gnome marker at the destination coordinates  
+	var gnomeMarker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
+	addMarkerToGame(gnomeMarker);
+	enableMarker(gnomeMarker); //force at least one marker found (closest) so testing is easier...
+	
 	//add some Markers at random places
 	for (var i = 0; i < 4; i++)
 	{
@@ -354,11 +372,11 @@ function addManualMarkersForTesting(lat, lng)
 		var bearing = Math.floor(Math.random() * 360);
 		var destinationCoordinates = calculateDestination(lat, lng, meters, bearing);
 		log("will place a random gnome "+meters+"m away at bearing "+bearing+" resulting in "+destinationCoordinates);
-		var marker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
-		marker.markerID = i;
-		addMarkerToGame(marker);
+		var gnomeMarker = L.marker(destinationCoordinates, {icon: gnomeIconNotFound}).addTo(map);
+		addMarkerToGame(gnomeMarker);
 	}
-}
+	
+  }
 	
   function panZoomToUserLocation()
   {
@@ -392,69 +410,33 @@ function addManualMarkersForTesting(lat, lng)
   {
 	//add tooltip to indicate user not close enough by default...
 	marker.bindTooltip("You are not close enough to collect this item ("+getUserDistanceFromMarker(marker)+"m)");
-
-	//add marker to global markers array
 	Markers.push(marker);
   }
   
   function enableMarker(marker)
   {
-	marker.found = 1; //mark this item as found
+	marker.found = 1; //mark this gnome as found
 	marker.setIcon(gnomeIconFound); //green icon
 	
-	var popupContent = '<h4>This would contain the content of marker '+(marker.markerID)+'...</h4><iframe width="300" height="300" src="https://www.youtube.com/embed/dQw4w9WgXcQ?si=M7nPi4kHAJD7aQVC" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+	var popupContent = marker.popupContent;
 	marker.bindPopup(popupContent);
 	marker.unbindTooltip();
 	updateGameStats();
-	saveMarker(marker);
-  }
-
-  function saveMarker(marker)
-  {
-	if(!hasLocalStoragePermission())
-		return false; //we do not save the game
-
-	//check existence of the array of found markers
-	if(!window.localStorage.getItem("digit_markers_found"))
-		window.localStorage.setItem("digit_markers_found", "[]");
-
-	//get the found markers array
-	foundmarkers = JSON.parse(window.localStorage.getItem("digit_markers_found"));
-
-	//check if not already in array
-	if(foundmarkers.includes(marker.markerID))
-		return true; //nothing to save, already there
-
-	//not found yet, append the new marker ID to the array
-	foundmarkers.push(marker.markerID);
-
-	//save it to local storage
-	window.localStorage.setItem("digit_markers_found", JSON.stringify(foundmarkers));
-  }
-
-  function checkIfFound(marker)
-  {
-	if(!hasLocalStoragePermission())
-		return false; //we do not have permission to save state
-
-	//check existence of the array of found markers
-	if(!window.localStorage.getItem("digit_markers_found"))
-		window.localStorage.setItem("digit_markers_found", "[]");
-
-	//get the found markers array
-	foundmarkers = JSON.parse(window.localStorage.getItem("digit_markers_found"));
-
-	//check if not already in array
-	if(foundmarkers.includes(marker.markerID))
-		return true; //found already
-	else
-		return false; //not found yet
+	saveGame(marker);
   }
   
   function updateGameStats()
   {
 	MarkersFound = MarkersFound + 1;
 	document.getElementById("itemsfound").innerHTML = MarkersFound; //update counter  
+  }
+  
+  function saveGame(marker)
+  {
+	  if(hasLocalStoragePermission())
+	  {
+		  window.localStorage.setItem("digit_markers_found")
+	  }
   }
 
   function log(msg)

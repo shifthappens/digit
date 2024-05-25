@@ -329,9 +329,12 @@ function initGame(pos)
 	  manualMarkersPlaced = true;
 	}
 
-	panZoomToUserLocation();
-	userZoomed = true;
-	userFocussed = true;
+	if(enablePanZoomToUserLocation)
+	{
+		panZoomToUserLocation();
+		userZoomed = true;
+		userFocussed = true;
+	}
 
 	watchUserPosition();
 }
@@ -421,9 +424,6 @@ function addManualMarkersForTesting(lat, lng)
 	
   function panZoomToUserLocation()
   {
-	if(!enablePanZoomToUserLocation)
-		return false;
-
 	userLatLng = userPositionMarker.getLatLng();
 	map.setView([userLatLng.lat, userLatLng.lng]);
 	// Set map focus to current user position

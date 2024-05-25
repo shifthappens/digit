@@ -5,6 +5,7 @@ var debugMode = true; //set debug mode on or off (disables logging)
 var enableTestMarkers = true; //whether or not to place markers for testing purposes on the map
 var enablePanZoomToUserLocation = false; //whether or not to pan and zoom automatically to user position (can be handy during testing)
 var enableMarkersByDefault = true; //wheter or not to enable every Mapotic marker to be enabled by default (mark as found) useful during testing
+var map_config_endpoint_url = "https://script.google.com/macros/s/AKfycbyQ0TC3RBinYz_95CPooTwlrV0cI4Sp7-jXvIi_o8a-h_fuWExA9fb_sEpn01GUlkkdWA/exec"; //for fetching the API key and map style ID from Jonathan
 
 /* options object for geolocation positioning */
 const geoLocationOptions = {
@@ -51,6 +52,13 @@ var startGameButton = document.getElementById("startgame"); // Get the <button> 
 
 
 /* END OF GLOBAL VARIABLES AND OBJECTS */
+
+ // get map style config vars for maptiler
+async function fetchMapTilerConfig() {
+	const response = await fetch(map_config_endpoint_url);
+	const mapConfig = await response.json();
+	return mapConfig;
+};
 
 function enableLocalStorage()
 {
@@ -117,15 +125,19 @@ checkGeoLocationPermissionStatus();
 
   //initiate the map
   map = L.map('map').setView([50.08457, 14.43277], 13);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-	  maxZoom: 19,
-	  attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map);
+
+  	//add map style
+  fetchMapTilerConfig().then(mapConfig => {
+
+	const mtLayer = L.maptilerLayer({
+		apiKey: mapConfig.apiKey,
+		style: mapConfig.style,
+	  }).addTo(map);
+	
+  }).catch(error => {
+	console.error('Error fetching map config: ', error);
+  });
   
-  //change the style of the map
-  L.tileLayer.provider('Thunderforest.Pioneer', {apikey: '8cc9511579274e1489a20d86798ad9fa'}).addTo(map);
-
-
 //custom Icons for the map
 var userLocationIcon = L.icon({
 	iconUrl: 'images/gps2.png',

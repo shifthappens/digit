@@ -50,7 +50,6 @@ var startGameButton = document.getElementById("startgame"); // Get the <button> 
 
 
 
-
 /* END OF GLOBAL VARIABLES AND OBJECTS */
 
  // get map style config vars for maptiler
@@ -105,18 +104,23 @@ function checkGeoLocationPermissionStatus()
 }
     
   // When the user clicks on button, and the location is available, close the modal, start game
-  startGameButton.onclick = function() 
-  {
-	log("trying to start game...");
-	if(geoLocationPermissionGranted)
+  document.addEventListener('DOMContentLoaded', async () => {
+	startGameButton.innerHTML = "OK Got it, let me play!";
+	startGameButton.disabled = false;
+
+	startGameButton.onclick = function() 
 	{
-		gamewelcome.style.display = "none";
+		log("trying to start game...");
+		if(geoLocationPermissionGranted)
+		{
+			gamewelcome.style.display = "none";
+		}
+		else
+		{
+			alert("Cannot start game: permission to use location is denied. Please complete step 1.");
+		}
 	}
-	else
-	{
-	 	alert("Cannot start game: permission to use location is denied. Please complete step 1.");
-	}
-  }
+});
 
 //check if user permissions have already been given, and set up game in background
 //otherwise do nothing, wait for user.
@@ -155,83 +159,57 @@ var gnomeIconFound = L.icon({
 });
 
 //get the data from Mapotic API with AJAX request
-function getMarkersFromMapotic()
+async function getMarkersFromMapotic()
 {
-	var mapoticPOISreq = new XMLHttpRequest();
-	mapoticPOISreq.onreadystatechange = processMapoticPOISResponse;
-	mapoticPOISreq.open("GET", "https://www.mapotic.com/api/v1/maps/"+MapoticMapID+"/pois.geojson/");
-	mapoticPOISreq.send();
-
-	function processMapoticPOISResponse()
-	{
-		if (mapoticPOISreq.readyState != 4) return; // State 4 is DONE
-
-		var mapinfo = JSON.parse(mapoticPOISreq.responseText);
+	try {
+		const response = await fetch(`https://www.mapotic.com/api/v1/maps/${MapoticMapID}/pois.geojson/`);
+		const mapinfo = await response.json();
 
 		log(mapinfo);
 
-		mapinfo.features.forEach((feature, i) => {
-		if(feature.properties.category_name.en == "Mural") //Mural is the name of the category used for all items to be displayed in Prague
-		{
-			//log(feature);
-			log("adding item "+feature.properties.id+" at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
-			log("adding a marker at "+feature.geometry.coordinates[0]+", "+feature.geometry.coordinates[1]);
-			var lng = feature.geometry.coordinates[0];
-			var lat = feature.geometry.coordinates[1];
-			var Marker = L.marker([lat, lng], {icon: gnomeIconNotFound}).addTo(map);
-			Marker.found = false;
-			Marker.markerID = feature.properties.id;
-			addMarkerToGame(Marker);
+		for (const feature of mapinfo.features) {
+			if (feature.properties.category_name.en === "Mural") {
+				log(`adding item ${feature.properties.id} at ${feature.geometry.coordinates[0]}, ${feature.geometry.coordinates[1]}`);
 
-			//get other data about this marker from Mapotic
-			var POIDetailsreq = new XMLHttpRequest();
-			POIDetailsreq.onreadystatechange = processMapoticPOIDetailResponse;
-			POIDetailsreq.open("GET", "https://www.mapotic.com/api/v1/maps/"+MapoticMapID+"/public-pois/"+Marker.markerID+"/");
-			POIDetailsreq.send();
+				const lng = feature.geometry.coordinates[0];
+				const lat = feature.geometry.coordinates[1];
+				const marker = L.marker([lat, lng], { icon: gnomeIconNotFound }).addTo(map);
+				marker.found = false;
+				marker.markerID = feature.properties.id;
 
-			function processMapoticPOIDetailResponse()
-			{
-				if (POIDetailsreq.readyState != 4) return; // State 4 is DONE
+				// Fetch additional data about the marker
+				const detailResponse = await fetch(`https://www.mapotic.com/api/v1/maps/${MapoticMapID}/public-pois/${marker.markerID}/`);
+				const POIinfo = await detailResponse.json();
 
-				var POIinfo = JSON.parse(POIDetailsreq.responseText);
+				// Construct the popup content from the Mapotic response
+				const markerTitle = POIinfo.name;
+				let markerDesc = "";
+				for (const attribute of POIinfo.attributes_values) {
+					if (attribute.attribute.name.en === "Description") {
+						markerDesc = attribute.value_html;
+						break;
+					}
+				}
 
-				log(POIinfo);
+				const markerImageURL = POIinfo.image.image.medium;
+				marker.popupContent = `<strong>${markerTitle}</strong> <br /><img src='${markerImageURL}' style='width: 100%;' /><p>${markerDesc}</p>`;
 
-				//construct the popup content from the mapotic response
-				var markerTitle = POIinfo.name;
-				
-				//loop through all the attributes that come with this marker to find the description text area
-				for (let i = 0; i < POIinfo.attributes_values.length; i++) {
-					const attribute = POIinfo.attributes_values[i];
+				log(marker.popupContent);
 
-					if(attribute.attribute.name.en == "Description")
-						{
-							log("yes, found a description to go with this marker...");
-							var markerDesc = attribute.value_html;
-							break;
-						}
-				};
+				addMarkerToGame(marker);
 
-				var markerImageURL = POIinfo.image.image.medium;
-
-				Marker.popupContent = "<strong>" + markerTitle + "</strong> <br />" + "<img src='"+markerImageURL+"' style='width: 100%;' />" + "<p>"+markerDesc + "</p>";
-
-				log(Marker.popupContent);
-
-				addMarkerToGame(Marker);
-
-				if(checkIfFound(Marker))
-					enableMarker(Marker);
-				
-				if(enableMarkersByDefault)
-					enableMarker(Marker);
+				if (checkIfFound(marker)) enableMarker(marker);
+				if (enableMarkersByDefault) enableMarker(marker);
 			}
 		}
-		});
 
 		document.getElementById("totalitems").innerHTML = Markers.length;
 		checkDistanceToMarkers(userPositionMarker);
-		}
+		allMarkersLoaded = true;
+
+	} catch (error) {
+		console.error('Error fetching Mapotic data: ', error);
+	}
 }
 
 /* Function to get location permission from user */
@@ -249,7 +227,6 @@ function getGeoLocationPermission(onSuccessCallback)
 
 	function onLocationPermissionGranted(pos)
 	{
-		log("onsuccesscallback is of type "+typeof(onSuccessCallback));
 
 		setGeoLocationPermissionState('granted');
 		initGame(pos);
@@ -314,7 +291,6 @@ function initGame(pos)
 	if(!allMarkersLoaded)
 	{
 	  getMarkersFromMapotic();
-	  allMarkersLoaded = true;
 	}
 
 	placeUpdateUserPositionMarker(pos);

@@ -4,7 +4,6 @@ var minDistanceFromMarker = 10;   //Setting how close the user needs to be to a 
 var debugMode = true; //set debug mode on or off (disables logging)
 var enableTestMarkers = true; //whether or not to place markers for testing purposes on the map
 var enablePanZoomToUserLocation = false; //whether or not to pan and zoom automatically to user position (can be handy during testing)
-var enableMarkersByDefault = true; //wheter or not to enable every Mapotic marker to be enabled by default (mark as found) useful during testing
 var map_config_endpoint_url = "https://script.google.com/macros/s/AKfycbyQ0TC3RBinYz_95CPooTwlrV0cI4Sp7-jXvIi_o8a-h_fuWExA9fb_sEpn01GUlkkdWA/exec"; //for fetching the API key and map style ID from Jonathan
 
 /* options object for geolocation positioning */

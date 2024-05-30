@@ -1,6 +1,6 @@
 /* Settings */
 var MapoticMapID = 17890; //Mapotic Map ID to query over HTTP GET requests API
-var minDistanceFromMarker = 10;   //Setting how close the user needs to be to a marker to trigger its action
+var minDistanceFromMarker = 15;   //Setting how close the user needs to be to a marker to trigger its action
 var debugMode = true; //set debug mode on or off (disables logging)
 var enableTestMarkers = false; //whether or not to place markers for testing purposes on the map
 var enablePanZoomToUserLocation = false; //whether or not to pan and zoom automatically to user position (can be handy during testing)

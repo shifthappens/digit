@@ -2,8 +2,9 @@
 var MapoticMapID = 17890; //Mapotic Map ID to query over HTTP GET requests API
 var minDistanceFromMarker = 10;   //Setting how close the user needs to be to a marker to trigger its action
 var debugMode = true; //set debug mode on or off (disables logging)
-var enableTestMarkers = true; //whether or not to place markers for testing purposes on the map
+var enableTestMarkers = false; //whether or not to place markers for testing purposes on the map
 var enablePanZoomToUserLocation = false; //whether or not to pan and zoom automatically to user position (can be handy during testing)
+var enableMarkersByDefault = false; //wheter or not to enable every Mapotic marker to be enabled by default (mark as found) useful during testing
 var map_config_endpoint_url = "https://script.google.com/macros/s/AKfycbyQ0TC3RBinYz_95CPooTwlrV0cI4Sp7-jXvIi_o8a-h_fuWExA9fb_sEpn01GUlkkdWA/exec"; //for fetching the API key and map style ID from Jonathan
 
 /* options object for geolocation positioning */
@@ -39,7 +40,16 @@ geoLocationPermissionButton.onclick = getGeoLocationPermission;
 //"save game" check and set logic
 var localStoragePermissionButton = document.getElementById("enable-localstorage"); //Get the "save game" permission button
 if(hasLocalStoragePermission())
+{
 	setLocalStoragePermissionState("granted");
+	if(window.localStorage.getItem("digit_markers_found"))
+	{
+		foundmarkers = JSON.parse(window.localStorage.getItem("digit_markers_found"));
+		//check if marker 1 is in array
+		if(foundmarkers.includes(1) && !enableTestMarkers)
+			window.localStorage.setItem("digit_markers_found", "[]"); //reset the savegame when a test marker is set and test markers are set to off
+	}
+}
 else
 	localStoragePermissionButton.onclick = enableLocalStorage;
 
@@ -148,12 +158,12 @@ var userLocationIcon = L.icon({
 });
 
 var gnomeIconNotFound = L.icon({
-  iconUrl: 'images/gnomered.png',
+  iconUrl: 'images/molered.png',
   iconSize: [32, 32],
 });
 
 var gnomeIconFound = L.icon({
-  iconUrl: 'images/gnomegreen.png',
+  iconUrl: 'images/molegreen.png',
   iconSize: [32, 32],
 });
 
